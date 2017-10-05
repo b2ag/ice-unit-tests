@@ -285,14 +285,14 @@ def forward_ice_msg( from_socket, to_socket ):
 def test_ice_local_connection( ice_process, rpc_client, gpgnet_gameside, peer_traffic_gameside, ice_2nd_process, rpc_2nd_client, gpgnet_2nd_gameside, peer_traffic_2nd_gameside ):
 
  _test_host_game( ice_process, rpc_client, gpgnet_gameside, ice_options )
- peer_address = _test_join_game( ice_2nd_process, rpc_2nd_client, gpgnet_2nd_gameside, ice_2nd_instance_options, ice_options['login'], ice_options['id'] )
- peer_address = peer_address.split(':')
- peer = simple_socket_setup( peer_address[0], int(peer_address[1]) )
+ peer2_address = _test_join_game( ice_2nd_process, rpc_2nd_client, gpgnet_2nd_gameside, ice_2nd_instance_options, ice_options['login'], ice_options['id'] )
+ peer2_address = peer2_address.split(':')
+ peer2 = simple_socket_setup( peer2_address[0], int(peer2_address[1]) )
 
  _test_connect_to_peer( ice_process, rpc_client, gpgnet_gameside, ice_2nd_instance_options['login'], ice_2nd_instance_options['id'], True )
  gameside_message = gpgnet_gameside.recv(1024)
- peer2_address = re.findall( r'(127.0.0.1:[0-9]+)', str(gameside_message) )[0].split(':')
- peer2 = simple_socket_setup( peer2_address[0], int(peer2_address[1]) ) 
+ peer_address = re.findall( r'(127.0.0.1:[0-9]+)', str(gameside_message) )[0].split(':')
+ peer = simple_socket_setup( peer_address[0], int(peer_address[1]) ) 
 
  rpc_client.setblocking(0)
  rpc_2nd_client.setblocking(0)
@@ -300,15 +300,13 @@ def test_ice_local_connection( ice_process, rpc_client, gpgnet_gameside, peer_tr
  peer2_connected = False
  for i in range(100000):
   messages = forward_ice_msg( rpc_client, rpc_2nd_client )
-  if messages:
-   for message in messages:
-    if message['method'] == 'onDatachannelOpen' and message['params'] == [ ice_options['id'], ice_2nd_instance_options['id']]:
-     peer_connected = True
+  for message in messages:
+   if message['method'] == 'onDatachannelOpen' and message['params'] == [ ice_options['id'], ice_2nd_instance_options['id']]:
+    peer2_connected = True
   messages = forward_ice_msg( rpc_2nd_client, rpc_client )  
-  if messages:
-   for message in messages:
-    if message['method'] == 'onDatachannelOpen' and message['params'] == [ ice_2nd_instance_options['id'], ice_options['id']]:
-     peer2_connected = True
+  for message in messages:
+   if message['method'] == 'onDatachannelOpen' and message['params'] == [ ice_2nd_instance_options['id'], ice_options['id']]:
+    peer_connected = True
   if peer_connected and peer2_connected:
    break
  assert peer_connected and peer2_connected
@@ -316,9 +314,9 @@ def test_ice_local_connection( ice_process, rpc_client, gpgnet_gameside, peer_tr
  rpc_2nd_client.setblocking(1)
 
  for i in range(10000): 
-  peer.send(b'PING')
+  peer2.send(b'PING')
   assert peer_traffic_gameside.recv(1024) == b'PING'
-  peer2.send(b'PONG')
+  peer.send(b'PONG')
   assert peer_traffic_2nd_gameside.recv(1024) == b'PONG'
   
 
