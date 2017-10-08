@@ -8,20 +8,21 @@ import socket
 import struct
 
 
-ice_executable = '/usr/bin/faf-ice-adapter'
+#ice_executable = '/usr/bin/faf-ice-adapter'
+ice_executable = '/home/b2ag/build/ice-unit-tests/faf-ice-adapter'
 ice_options = {
  'id':  12345,
  'login': 'Rhiza',
- 'rpc_port': 10000 + 0,
- 'gpgnet_port': 10000 + 1,
- 'lobby_port': 10000 + 2,
+ 'rpc-port': 10000 + 0,
+ 'gpgnet-port': 10000 + 1,
+ 'lobby-port': 10000 + 2,
 }
 ice_2nd_instance_options = {
  'id':  54321,
  'login': 'Kael',
- 'rpc_port': 20000 + 0,
- 'gpgnet_port': 20000 + 1,
- 'lobby_port': 20000 + 2,
+ 'rpc-port': 20000 + 0,
+ 'gpgnet-port': 20000 + 1,
+ 'lobby-port': 20000 + 2,
 }
 
 
@@ -223,28 +224,28 @@ def test_gpgmessage():
 
 def _test_initial_handshake( ice_process, rpc_client, gpgnet_gameside, ice_options ):
  try: 
-  assert rpc_client.recv(1024) == b'{"jsonrpc":"2.0","method":"onConnectionStateChanged","params":["Connected"]}'
+  assert rpc_client.recv(1024).strip() == b'{"jsonrpc":"2.0","method":"onConnectionStateChanged","params":["Connected"]}'
  except socket.timeout:
   pass
  gpgnet_gameside.send( GpgNetMessage( [ ('GameState', 'Idle') ] ) )
- assert rpc_client.recv(1024) == b'{"jsonrpc":"2.0","method":"onGpgNetMessageReceived","params":["GameState",["Idle"]]}'
- assert gpgnet_gameside.recv(1024) == GpgNetMessage([ ( 'CreateLobby', 0, ice_options['lobby_port'], ice_options['login'], ice_options['id'], 1 ) ])
+ assert rpc_client.recv(1024).strip() == b'{"jsonrpc":"2.0","method":"onGpgNetMessageReceived","params":["GameState",["Idle"]]}'
+ assert gpgnet_gameside.recv(1024) == GpgNetMessage([ ( 'CreateLobby', 0, ice_options['lobby-port'], ice_options['login'], ice_options['id'], 1 ) ])
  gpgnet_gameside.send( GpgNetMessage( [ ('GameState', 'Lobby') ] ) )
- assert rpc_client.recv(1024) == b'{"jsonrpc":"2.0","method":"onGpgNetMessageReceived","params":["GameState",["Lobby"]]}'
- rpc_client.send(b'{"jsonrpc":"2.0","method":"setIceServers","params":[{"urls":"stun:stun.l.google.com:19302"}]}')
+ assert rpc_client.recv(1024).strip() == b'{"jsonrpc":"2.0","method":"onGpgNetMessageReceived","params":["GameState",["Lobby"]]}'
+ rpc_client.send(b'{"jsonrpc":"2.0","method":"setIceServers","params":[{"urls":"stun:stun.l.google.com:19302"}]}\n')
 def test_initial_handshake( ice_process, rpc_client, gpgnet_gameside ):
  _test_initial_handshake( ice_process, rpc_client, gpgnet_gameside, ice_options )
  
 def _test_host_game( ice_process, rpc_client, gpgnet_gameside, ice_options ):
  _test_initial_handshake( ice_process, rpc_client, gpgnet_gameside, ice_options )
- rpc_client.send(b'{"jsonrpc":"2.0","method":"hostGame","params":["monument_valley.v0001"]}')
+ rpc_client.send(b'{"jsonrpc":"2.0","method":"hostGame","params":["monument_valley.v0001"]}\n')
  assert gpgnet_gameside.recv(1024) == GpgNetMessage([ ( 'HostGame', 'monument_valley.v0001' ) ])
 def test_host_game( ice_process, rpc_client, gpgnet_gameside ):
  _test_host_game( ice_process, rpc_client, gpgnet_gameside, ice_options )
 
 def _test_join_game( ice_process, rpc_client, gpgnet_gameside, ice_options, remote_login, remote_id ):
  _test_initial_handshake( ice_process, rpc_client, gpgnet_gameside, ice_options )
- rpc_client.send(b'{"jsonrpc":"2.0","method":"joinGame","params":["'+remote_login.encode()+b'",'+str(remote_id).encode()+b']}')
+ rpc_client.send(b'{"jsonrpc":"2.0","method":"joinGame","params":["'+remote_login.encode()+b'",'+str(remote_id).encode()+b']}\n')
  gameside_message = gpgnet_gameside.recv(1024)
  address = re.findall( r'(127.0.0.1:[0-9]+)', str(gameside_message) )[0]
  assert gameside_message == GpgNetMessage([ ( 'JoinGame', address, remote_login, remote_id ) ])
@@ -253,7 +254,7 @@ def test_join_game( ice_process, rpc_client, gpgnet_gameside ):
  _test_join_game( ice_process, rpc_client, gpgnet_gameside, ice_options, ice_options['login'], ice_options['id'] )
 
 def _test_connect_to_peer( ice_process, rpc_client, gpgnet_gameside, remote_login, remote_id, offer ):
- rpc_client.send(b'{"jsonrpc":"2.0","method":"connectToPeer","params":["'+remote_login.encode()+b'",'+str(remote_id).encode()+b','+(b'true' if offer else b'false')+b']}')
+ rpc_client.send(b'{"jsonrpc":"2.0","method":"connectToPeer","params":["'+remote_login.encode()+b'",'+str(remote_id).encode()+b','+(b'true' if offer else b'false')+b']}\n')
 
 def simple_socket_setup( ip, port ):
  simple_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -264,7 +265,7 @@ def simple_socket_setup( ip, port ):
 def forward_ice_msg( from_socket, to_socket ):
  return_messages = []
  try:
-  raw_messages = from_socket.recv(1024).split(b'}{')
+  raw_messages = from_socket.recv(1024).split(b'}\n{')
   for i in range(len(raw_messages)):
    if i < len(raw_messages)-1:
     raw_messages[i] += b'}'
@@ -298,15 +299,17 @@ def test_ice_local_connection( ice_process, rpc_client, gpgnet_gameside, peer_tr
  rpc_2nd_client.setblocking(0)
  peer_connected = False
  peer2_connected = False
- for i in range(100000):
+ for i in range(1000000):
   messages = forward_ice_msg( rpc_client, rpc_2nd_client )
   for message in messages:
    if message['method'] == 'onDatachannelOpen' and message['params'] == [ ice_options['id'], ice_2nd_instance_options['id']]:
     peer2_connected = True
+   print(message)
   messages = forward_ice_msg( rpc_2nd_client, rpc_client )  
   for message in messages:
    if message['method'] == 'onDatachannelOpen' and message['params'] == [ ice_2nd_instance_options['id'], ice_options['id']]:
     peer_connected = True
+   print(message)
   if peer_connected and peer2_connected:
    break
  assert peer_connected and peer2_connected
